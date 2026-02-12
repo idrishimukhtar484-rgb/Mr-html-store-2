@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nexus Neon | All-In-One Fixed</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    
+    <style>
+        :root {
+            --bg: #05060f;
+            --accent: #00f2ff;
+            --purple: #bc13fe;
+            --glass: rgba(255, 255, 255, 0.05);
+            --sidebar-w: 280px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; overflow-x: hidden; width: 100%; }
+
+        /* --- RED FILTER --- */
+        #payment-filter { position: fixed; inset: 0; background: rgba(255, 0, 0, 0.2); pointer-events: none; z-index: 5000; display: none; border: 8px solid red; }
+
+        /* --- HEADER --- */
+        header { 
+            padding: 15px 20px; background: rgba(0,0,0,0.9); display: flex; align-items: center; 
+            position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--glass);
+        }
+        .menu-btn { font-size: 28px; cursor: pointer; color: var(--accent); margin-right: 15px; }
+        .brand { font-weight: bold; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            position: fixed; left: -110%; top: 0; width: var(--sidebar-w); height: 100%;
+            background: #0d0e1a; z-index: 9999; padding: 25px;
+            border-right: 1px solid var(--accent); transition: 0.4s ease-in-out;
+        }
+        #sidebar.active { left: 0; box-shadow: 20px 0 50px rgba(0,0,0,0.9); }
+        #menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9998; display: none; }
+        
+        .side-item {
+            display: block; padding: 15px; color: white; text-decoration: none;
+            border-radius: 12px; margin-bottom: 10px; cursor: pointer; background: var(--glass);
+        }
+        .side-item:hover { background: var(--accent); color: black; }
+
+        /* --- PRODUCT GRID --- */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 15px; }
+        .card { background: var(--glass); padding: 12px; border-radius: 18px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .card img { width: 100%; border-radius: 12px; aspect-ratio: 1; object-fit: cover; }
+
+        /* --- MODALS --- */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 10000; padding: 20px; }
+        .modal-content { background: #111; width: 100%; max-width: 350px; padding: 25px; border-radius: 25px; border: 1px solid var(--accent); text-align: center; max-height: 80vh; overflow-y: auto; }
+        input { width: 100%; padding: 14px; margin: 10px 0; background: #222; border: 1px solid #444; color: white; border-radius: 10px; outline: none; }
+        .btn-pay { width: 100%; padding: 15px; border-radius: 10px; border: none; font-weight: bold; background: var(--accent); color: black; cursor: pointer; }
+        
+        .choice-container { display: flex; gap: 10px; margin: 20px 0; }
+        .choice-box { flex: 1; padding: 15px; border: 1px solid var(--accent); border-radius: 12px; cursor: pointer; background: rgba(0,242,255,0.05); }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="payment-filter"></div>
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+
+<nav id="sidebar">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+        <h2 style="color:var(--accent); margin:0;">Menu</h2>
+        <div style="font-size:30px; cursor:pointer;" onclick="toggleMenu()">✕</div>
+    </div>
+    <div class="side-item" onclick="showPage('store')">🏠 Home Store</div>
+    <div class="side-item" onclick="openPolicy('refund')">🔄 Refund Policy</div>
+    <div class="side-item" onclick="openPolicy('terms')">⚖️ Terms of Service</div>
+    <div class="side-item" onclick="openPolicy('privacy')">🛡️ Privacy Policy</div>
+    <div class="side-item" onclick="showPage('contact')">📞 Contact Us</div>
+</nav>
+
+<header>
+    <div class="menu-btn" onclick="toggleMenu()">☰</div>
+    <div class="brand">Nexus Neon</div>
+</header>
+
+<div id="page-store">
+    <div id="product-grid" class="grid"></div>
+</div>
+
+<div id="page-contact" class="hidden" style="padding:40px; text-align:center;">
+    <div class="card" style="padding:20px;">
+        <h2>Support</h2>
+        <p id="c-email">Email: Loading...</p>
+        <p id="c-phone">WhatsApp: Loading...</p>
+        <button class="btn-pay" onclick="showPage('store')">Back to Shop</button>
+    </div>
+</div>
+
+<div id="modal-policy" class="modal">
+    <div class="modal-content">
+        <h2 id="policy-title" style="color:var(--accent)">Policy</h2>
+        <p id="policy-text" style="text-align:left; font-size:0.9rem; line-height:1.5; color:#ccc;"></p>
+        <button class="btn-pay" onclick="closeModals()">Close</button>
+    </div>
+</div>
+
+<div id="modal-choice" class="modal">
+    <div class="modal-content">
+        <h2 id="choice-prod-name">Product Name</h2>
+        <div class="choice-container">
+            <div class="choice-box" onclick="selectType('Prompt')">
+                <span>Prompt</span>
+                <b id="p-price">₹0</b>
+            </div>
+            <div class="choice-box" onclick="selectType('Code')" style="border-color:var(--purple)">
+                <span style="color:var(--purple)">Full Code</span>
+                <b id="c-price" style="color:var(--purple)">₹0</b>
+            </div>
+        </div>
+        <p onclick="closeModals()" style="color:grey; cursor:pointer;">Cancel</p>
+    </div>
+</div>
+
+<div id="modal-details" class="modal">
+    <div class="modal-content">
+        <h2>Buyer Details</h2>
+        <input type="text" id="u-name" placeholder="Full Name">
+        <input type="number" id="u-phone" placeholder="WhatsApp Number">
+        <button class="btn-pay" onclick="payNow()">PROCEED TO PAY</button>
+        <p onclick="closeModals()" style="color:grey; cursor:pointer; margin-top:10px;">Cancel</p>
+    </div>
+</div>
+
+<div id="modal-utr" class="modal">
+    <div class="modal-content" style="border-color:red;">
+        <h2 style="color:red;">Verify Payment</h2>
+        <p>Pay ₹<span id="final-amt">0</span> and enter 12-digit UTR:</p>
+        <input type="number" id="u-utr" placeholder="12 Digit UTR Number">
+        <button class="btn-pay" style="background:red; color:white;" onclick="submitOrder()">SUBMIT UTR</button>
+        <button onclick="payNow()" style="background:none; border:1px solid orange; color:orange; width:100%; margin-top:10px; padding:10px; border-radius:10px;">Retry App</button>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAG3Uh_vcspM9P6pxAXZ8l4hMDa6rz_tkk",
+  databaseURL: "https://datore-96fc6-default-rtdb.firebaseio.com",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let currentProduct = null;
+let selectedType = "";
+let selectedPrice = 0;
+
+// Sidebar Functions
+function toggleMenu() {
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('menu-overlay');
+    const isActive = sb.classList.toggle('active');
+    overlay.style.display = isActive ? 'block' : 'none';
+}
+
+function showPage(id) {
+    document.getElementById('page-store').classList.add('hidden');
+    document.getElementById('page-contact').classList.add('hidden');
+    document.getElementById('page-' + id).classList.remove('hidden');
+    if(document.getElementById('sidebar').classList.contains('active')) toggleMenu();
+}
+
+// Policies Fetching (AB WORK KAREGA)
+function openPolicy(type) {
+    if(document.getElementById('sidebar').classList.contains('active')) toggleMenu();
+    document.getElementById('policy-title').innerText = type.toUpperCase() + " POLICY";
+    document.getElementById('policy-text').innerText = "Loading...";
+    document.getElementById('modal-policy').style.display = 'flex';
+
+    db.ref('policies/' + type).once('value', s => {
+        document.getElementById('policy-text').innerText = s.val() || "Policy text not found in database.";
+    });
+}
+
+// Load Store Data
+db.ref('products').on('value', s => {
+    const grid = document.getElementById('product-grid');
+    grid.innerHTML = '';
+    s.forEach(c => {
+        const p = c.val();
+        grid.innerHTML += `<div class="card" onclick="openChoice('${p.title}', '${p.promptPrice}', '${p.codePrice}')"><img src="${p.imageUrl}"><h3>${p.title}</h3><b style="color:var(--accent)">₹${p.promptPrice}+</b></div>`;
+    });
+});
+
+db.ref('meta').on('value', s => {
+    if(s.exists()){
+        document.getElementById('c-email').innerText = "Email: " + s.val().contact.email;
+        document.getElementById('c-phone').innerText = "WhatsApp: " + s.val().contact.phone;
+    }
+});
+
+function openChoice(name, pPrice, cPrice) {
+    currentProduct = name;
+    document.getElementById('choice-prod-name').innerText = name;
+    document.getElementById('p-price').innerText = "₹"+pPrice;
+    document.getElementById('c-price').innerText = "₹"+cPrice;
+    window.pPriceVal = pPrice; window.cPriceVal = cPrice;
+    document.getElementById('modal-choice').style.display = 'flex';
+}
+
+function selectType(type) {
+    selectedType = type;
+    selectedPrice = (type === 'Prompt') ? window.pPriceVal : window.cPriceVal;
+    document.getElementById('modal-choice').style.display = 'none';
+    document.getElementById('modal-details').style.display = 'flex';
+}
+
+function payNow() {
+    if(!document.getElementById('u-name').value) return alert("Details bhariye");
+    document.getElementById('payment-filter').style.display = 'block';
+    document.getElementById('modal-details').style.display = 'none';
+    document.getElementById('final-amt').innerText = selectedPrice;
+    document.getElementById('modal-utr').style.display = 'flex';
+    window.location.href = `upi://pay?pa=9769516928@fam&pn=NexusNeon&am=${selectedPrice}&cu=INR&tn=ORD${Date.now()}`;
+}
+
+function submitOrder() {
+    const utr = document.getElementById('u-utr').value;
+    if(utr.length !== 12) return alert("Sahi 12-digit UTR dalein");
+    db.ref('orders/ORD'+Date.now()).set({
+        customer: document.getElementById('u-name').value,
+        phone: document.getElementById('u-phone').value,
+        product: currentProduct,
+        type: selectedType,
+        amount: selectedPrice,
+        utr: utr,
+        time: Date.now()
+    }).then(() => { alert("Order Submitted!"); location.reload(); });
+}
+
+function closeModals() { 
+    document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); 
+    document.getElementById('payment-filter').style.display = 'none';
+}
+</script>
+</body>
+</html>
